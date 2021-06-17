@@ -1,10 +1,11 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <TJpg_Decoder.h>
-#define FS_NO_GLOBALS
+#include <ArduinoJson.h>  // v6.18.0
+#include <TFT_eSPI.h>
 #include <FS.h>
 #include "SPI.h"
-#include <TFT_eSPI.h>
+#define FS_NO_GLOBALS
 
 
 TFT_eSPI tft = TFT_eSPI();
@@ -60,6 +61,11 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) 
   return 1;
 }
 
+void loadFile() {
+  tft.fillScreen(TFT_BLACK);
+  TJpgDec.drawFsJpg(0, 0, "/img.jpg");
+}
+
 String urlEncode(String str)
 {
     String encodedString="";
@@ -105,12 +111,10 @@ void downloadImage(String title, String imgURL, String  date, String author) {
     if (f) {
       http.begin(url);
       int httpCode = http.GET();
-      if (httpCode > 0) {
-        if (httpCode == HTTP_CODE_OK) {
-          http.writeToStream(&f);
-        }
+      if (httpCode == HTTP_CODE_OK) {
+        http.writeToStream(&f);
       } else {
-        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+        Serial.printf("Getting images failed, error: %s\n", http.errorToString(httpCode).c_str());
       }
       f.close();
     }
@@ -118,10 +122,41 @@ void downloadImage(String title, String imgURL, String  date, String author) {
     loadFile();
 }
 
+void parseData(String input) {
+  DynamicJsonDocument doc(24576);
 
-void loadFile() {
-  tft.fillScreen(TFT_BLACK);
-  TJpgDec.drawFsJpg(0, 0, "/img.jpg");
+  DeserializationError error = deserializeJson(doc, input);
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+
+    for (JsonObject elem : doc["articles"].as<JsonArray>()) {
+      downloadImage(
+        elem["title"],
+        elem["urlToImage"],
+        elem["publishedAt"],
+        elem["author"]
+    );
+  delay(5000);
+  }
+
+}
+
+void fetchNews() {
+  String url = "http://newsapi.org/v2/top-headlines?country=in&apiKey=374125c2dfa441c9ae156b7378f2f6e9"; // must start with http
+  Serial.println(url);
+  http.begin(url);
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    parseData(http.getString());
+  }
+  else {
+    Serial.printf("Getting news failed failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
 }
 
 void setup() {
@@ -138,19 +173,5 @@ void setup() {
 }
 
 void loop() {
-  // fs::Dir directory = SPIFFS.openDir("/");
-  // while (directory.next()) {
-  //   String strname = directory.fileName();
-  //   // If filename ends in .jpg then load it
-  //   if (strname.endsWith(".jpg")) {
-  //   }
-  // }
-  // const char *name = '/.img.jpg';
-  downloadImage(
-    "NEO Surveyor: Space telescope to detect potentially dangerous asteroids heading for Earth - WION",
-    "https://cdn.wionews.com/sites/default/files/styles/story_page/public/2021/06/17/198836-neo-surveyor.jpg",
-    "2021-06-17",
-    "WION Web Team"
-  );
-  delay(5000);
+  fetchNews();
 }
