@@ -13,6 +13,7 @@ HTTPClient http;
 
 const char* SSID = "ZTE_2.4G_ExQCMa";                 // Your WiFi SSID
 const char* PASSWORD = "NullReferenceException#123";  // Your WiFi Password
+const char* NEWS_URL = "http://newsapi.org/v2/top-headlines?country=in&apiKey=123";
 
 // Display SDO/MISO to NodeMCU pin D6 (or leave disconnected if not reading TFT)
 // Display LED to NodeMCU pin VIN (or 5V, see below)
@@ -56,7 +57,7 @@ void setupWiFi() {
 
 
 bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
-  if ( y >= tft.height() ) return 0;
+  if (y >= tft.height()) return 0;
   tft.pushImage(x, y, w, h, bitmap);
   return 1;
 }
@@ -66,95 +67,55 @@ void loadFile() {
   TJpgDec.drawFsJpg(0, 0, "/img.jpg");
 }
 
-String urlEncode(String str)
-{
-    String encodedString="";
-    char c;
-    char code0;
-    char code1;
-    char code2;
-    for (int i =0; i < str.length(); i++){
-      c=str.charAt(i);
-      if (c == ' '){
-        encodedString+= '+';
-      } else if (isalnum(c)){
-        encodedString+=c;
-      } else{
-        code1=(c & 0xf)+'0';
-        if ((c & 0xf) >9){
-            code1=(c & 0xf) - 10 + 'A';
-        }
-        c=(c>>4)&0xf;
-        code0=c+'0';
-        if (c > 9){
-            code0=c - 10 + 'A';
-        }
-        code2='\0';
-        encodedString+='%';
-        encodedString+=code0;
-        encodedString+=code1;
-      }
-      yield();
+void downloadImage(String imgURL) {
+  String url = "http://news-image-api.herokuapp.com/get-image?imgURL=" + imgURL;
+  Serial.println(url);
+  File f = SPIFFS.open("/img.jpg", "w");
+  if (f) {
+    http.begin(url);
+    int httpCode = http.GET();
+    if (httpCode == HTTP_CODE_OK) {
+      http.writeToStream(&f);
+    } else {
+      Serial.printf("Getting images failed, error: %s\n", http.errorToString(httpCode).c_str());
     }
-    return encodedString;
-    
-}
-
-void downloadImage(String title, String imgURL, String  date, String author) {
-    title = "title=" + urlEncode(title);
-    imgURL = "&imgURL=" + imgURL;
-    date = "&date=" + urlEncode(date);
-    author = "&author=" + urlEncode(author);
-    String url = "http://news-image-api.herokuapp.com/?" + title + imgURL + date + author;
-    Serial.println(url);
-    File f = SPIFFS.open("/img.jpg", "w");
-    if (f) {
-      http.begin(url);
-      int httpCode = http.GET();
-      if (httpCode == HTTP_CODE_OK) {
-        http.writeToStream(&f);
-      } else {
-        Serial.printf("Getting images failed, error: %s\n", http.errorToString(httpCode).c_str());
-      }
-      f.close();
-    }
-    http.end();
-    loadFile();
+    f.close();
+  }
+  http.end();
+  loadFile();
 }
 
 void parseData(String input) {
-  DynamicJsonDocument doc(24576);
+
+  DynamicJsonDocument doc(3072);
 
   DeserializationError error = deserializeJson(doc, input);
+
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.f_str());
     return;
   }
 
-    for (JsonObject elem : doc["articles"].as<JsonArray>()) {
-      downloadImage(
-        elem["title"],
-        elem["urlToImage"],
-        elem["publishedAt"],
-        elem["author"]
-    );
-  delay(5000);
+  for (uint8_t i = 0; i < 15; i++) {  // todo: fix this loop
+    const char* root = doc[i];
+    Serial.println(root);
+    downloadImage(root);
+    delay(5000);
   }
-
 }
 
-void fetchNews() {
-  String url = "http://newsapi.org/v2/top-headlines?country=in&apiKey=374125c2dfa441c9ae156b7378f2f6e9"; // must start with http
+void generateNews() {
+  // String url = "http://news-image-api.herokuapp.com/generate" + NEWS_URL;
+  String url = "http://news-image-api.herokuapp.com/generate";  // todo: use API key from hardware
   Serial.println(url);
   http.begin(url);
   int httpCode = http.GET();
 
   if (httpCode == HTTP_CODE_OK) {
     parseData(http.getString());
-  }
-  else {
-    Serial.printf("Getting news failed failed, error: %s\n", http.errorToString(httpCode).c_str());
+  } else {
+    Serial.printf("Generating images failed, error: %s\n", http.errorToString(httpCode).c_str());
   }
   http.end();
 }
@@ -173,5 +134,5 @@ void setup() {
 }
 
 void loop() {
-  fetchNews();
+  generateNews();
 }
