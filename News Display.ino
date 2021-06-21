@@ -8,13 +8,6 @@
 #define FS_NO_GLOBALS
 
 
-TFT_eSPI tft = TFT_eSPI();
-HTTPClient http;
-
-const char* SSID = "ZTE_2.4G_ExQCMa";                 // Your WiFi SSID
-const char* PASSWORD = "NullReferenceException#123";  // Your WiFi Password
-const char* NEWS_URL = "http://newsapi.org/v2/top-headlines?country=in&apiKey=123";
-
 // Display SDO/MISO to NodeMCU pin D6 (or leave disconnected if not reading TFT)
 // Display LED to NodeMCU pin VIN (or 5V, see below)
 // Display SCK to NodeMCU pin D5
@@ -24,6 +17,15 @@ const char* NEWS_URL = "http://newsapi.org/v2/top-headlines?country=in&apiKey=12
 // Display CS to NodeMCU pin D8 (or GND, see below)
 // Display GND to NodeMCU pin GND (0V)
 // Display VCC to NodeMCU 5V or 3.3V
+
+
+TFT_eSPI tft = TFT_eSPI();
+HTTPClient http;
+
+const char* SSID = "ZTE_2.4G_ExQCMa";                 // Your WiFi SSID
+const char* PASSWORD = "NullReferenceException#123";  // Your WiFi Password
+
+const char* NEWS_URL = "https://newsapi.org/v2/top-headlines?country=in&apiKey=1234";
 
 
 void setupTFT() {
@@ -106,11 +108,18 @@ void parseData(String input) {
 }
 
 void generateNews() {
-  // String url = "http://news-image-api.herokuapp.com/generate" + NEWS_URL;
-  String url = "http://news-image-api.herokuapp.com/generate";  // todo: use API key from hardware
+  String url = "http://news-image-api.herokuapp.com/generate";
+  String reqBody;
+  StaticJsonDocument<128> doc;
+
+  doc["endpoint"] = NEWS_URL;
+
+  serializeJson(doc, reqBody);
+
   Serial.println(url);
   http.begin(url);
-  int httpCode = http.GET();
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(reqBody);
 
   if (httpCode == HTTP_CODE_OK) {
     parseData(http.getString());
