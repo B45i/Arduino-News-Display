@@ -25,7 +25,7 @@ HTTPClient http;
 const char* SSID = "ZTE_2.4G_ExQCMa";                 // Your WiFi SSID
 const char* PASSWORD = "NullReferenceException#123";  // Your WiFi Password
 
-const char* NEWS_URL = "https://newsapi.org/v2/top-headlines?country=in&apiKey=1234";
+const char* NEWS_URL = "https://newsapi.org/v2/top-headlines?country=in&apiKey=1fe4c0ba59564ef7aafa8e3831d1ad19";
 
 
 void setupTFT() {
@@ -65,7 +65,6 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) 
 }
 
 void loadFile() {
-  tft.fillScreen(TFT_BLACK);
   TJpgDec.drawFsJpg(0, 0, "/img.jpg");
 }
 
@@ -78,13 +77,13 @@ void downloadImage(String imgURL) {
     int httpCode = http.GET();
     if (httpCode == HTTP_CODE_OK) {
       http.writeToStream(&f);
+      loadFile();
     } else {
       Serial.printf("Getting images failed, error: %s\n", http.errorToString(httpCode).c_str());
     }
     f.close();
   }
   http.end();
-  loadFile();
 }
 
 void parseData(String input) {
