@@ -18,6 +18,7 @@
 // Display GND to NodeMCU pin GND (0V)
 // Display VCC to NodeMCU 5V or 3.3V
 
+#define NEWS_INTERVAL 2000
 
 TFT_eSPI tft = TFT_eSPI();
 HTTPClient http;
@@ -26,6 +27,8 @@ const char* SSID = "ZTE_2.4G_ExQCMa";                 // Your WiFi SSID
 const char* PASSWORD = "NullReferenceException#123";  // Your WiFi Password
 
 const char* NEWS_URL = "https://newsapi.org/v2/top-headlines?country=in&apiKey=1fe4c0ba59564ef7aafa8e3831d1ad19";
+
+String imageURLS;
 
 
 void setupTFT() {
@@ -78,6 +81,7 @@ void downloadImage(String imgURL) {
     if (httpCode == HTTP_CODE_OK) {
       http.writeToStream(&f);
       loadFile();
+      delay(NEWS_INTERVAL);
     } else {
       Serial.printf("Getting images failed, error: %s\n", http.errorToString(httpCode).c_str());
     }
@@ -86,11 +90,15 @@ void downloadImage(String imgURL) {
   http.end();
 }
 
-void parseData(String input) {
+void parseData() {
+
+  if (!imageURLS) {
+    return;
+  }
 
   DynamicJsonDocument doc(3072);
 
-  DeserializationError error = deserializeJson(doc, input);
+  DeserializationError error = deserializeJson(doc, imageURLS);
 
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
@@ -98,11 +106,10 @@ void parseData(String input) {
     return;
   }
 
-  for (uint8_t i = 0; i < 15; i++) {  // todo: fix this loop
-    const char* root = doc[i];
-    Serial.println(root);
-    downloadImage(root);
-    delay(5000);
+  JsonArray arr = doc.as<JsonArray>();
+
+  for (JsonVariant value : arr) {
+    downloadImage(value.as<String>());
   }
 }
 
@@ -121,8 +128,9 @@ void generateNews() {
   int httpCode = http.POST(reqBody);
 
   if (httpCode == HTTP_CODE_OK) {
-    parseData(http.getString());
+    imageURLS = http.getString();
   } else {
+    imageURLS = "";
     Serial.printf("Generating images failed, error: %s\n", http.errorToString(httpCode).c_str());
   }
   http.end();
@@ -139,8 +147,10 @@ void setup() {
 
   setupTFT();
   setupWiFi();
+  loadFile();  // show last downloaded image while new news is loading
 }
 
 void loop() {
   generateNews();
+  parseData();
 }
